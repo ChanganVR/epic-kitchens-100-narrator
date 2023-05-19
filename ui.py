@@ -669,7 +669,7 @@ class MicMonitor(FigureCanvas):
         ax.yaxis.grid(True)
         fig.tight_layout(pad=-5)
         ax.axis('off')
-        fig.canvas.set_window_title('Epic Narrator Monitor')
+#         fig.canvas.set_window_title('Epic Narrator Monitor')
 
         return fig, ax, lines, data
 
@@ -686,7 +686,8 @@ class MicMonitor(FigureCanvas):
 
         for column, line in enumerate(self.lines):
             line.set_ydata(self.data[:, column])
-            color = 'red' if self.is_recording else 'white'
+#             color = 'red' if self.is_recording else 'white'
+            color = 'red'
             line.set_color(color)
 
         return self.lines
