@@ -42,6 +42,7 @@ class Recordings:
             LOG.info("Deleting recording at {!r}".format(time))
             filepath = self._recordings[time]
             os.remove(filepath)
+            os.remove(filepath.replace('.wav', '.json'))
             LOG.info("Deleted recording {}".format(filepath))
             del self._recordings[time]
             self._recording_times.remove(time)  # no need to sort when we delete

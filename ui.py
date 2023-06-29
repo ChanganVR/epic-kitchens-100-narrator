@@ -12,10 +12,10 @@ import numpy as np
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, Gdk, Pango, GObject, GdkPixbuf
+from gi.repository import cairo
 from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_gtk3agg import (FigureCanvasGTK3Agg as FigureCanvas)
 from recordings import ms_to_timestamp
-
 
 LOG = logging.getLogger('epic_narrator.ui')
 
@@ -541,13 +541,13 @@ class Menu(Gtk.MenuBar):
         about_dialog.run()
         about_dialog.destroy()
 
-
 class VideoArea:
     def __init__(self, controller, single_window, width=900, height=400):
         self.video_width = width
         self.video_height = height
         self.single_window = single_window
         self.controller = controller
+        self.left_button_held = False
 
         if self.single_window:
             self.area = Gtk.DrawingArea()
@@ -557,6 +557,12 @@ class VideoArea:
 
         self.area.set_size_request(self.video_width, self.video_height)
         self.area.connect('realize', self.ready)
+        self.area.connect('motion-notify-event', self.on_motion_notify)
+        self.area.connect('button-press-event', self.on_key_press_event)
+        self.area.connect('button-release-event', self.on_key_release_event)
+        self.area.set_events(Gdk.EventMask.POINTER_MOTION_MASK)
+        
+        self.cursor_traj = []
 
         if self.single_window:
             # self.video_area.connect('configure_event', self.video_area_resized)
@@ -569,6 +575,51 @@ class VideoArea:
 
     def ready(self, widget):
         self.controller.ui_video_area_ready(widget)
+    
+    def on_motion_notify(self, widget, event):
+        if self.controller.is_recording() and self.left_button_held:
+            x, y = event.x, event.y
+            
+            raw_video_size = self.controller.video_size
+            window_size = self.area.get_size()
+            print('window size', window_size)
+            print(raw_video_size)
+            if window_size[0] / window_size[1] > raw_video_size[0] / raw_video_size[1]:
+                # area is wider than video
+                scaled_video_width = window_size[1] * raw_video_size[0] / raw_video_size[1]
+                x = x - (window_size[0] - scaled_video_width) / 2
+                # cut off the sides
+                x = max(0, x)
+                x = min(scaled_video_width, x)
+                
+                # convert x,y back to raw video coordinates
+                x = x * raw_video_size[0] / scaled_video_width
+                y = y * raw_video_size[1] / window_size[1]
+            else:
+                # area is taller than video
+                scaled_video_height = window_size[0] * raw_video_size[1] / raw_video_size[0]
+                y = y - (window_size[1] - scaled_video_height) / 2
+                
+                # cut off the top and bottom
+                y = max(0, y)
+                y = min(scaled_video_height, y)
+                
+                # convert back to the raw video coordinates
+                x = x * raw_video_size[0] / window_size[0]
+                y = y * raw_video_size[1] / scaled_video_height
+            
+            print(f"Mouse position: x={x}, y={y}")
+            
+            self.controller.cursor_traj.append((x, y))
+            # print(self.controller.cursor_traj)
+    
+    def on_key_press_event(self, widget, event):
+        if event.button == 1 and not self.left_button_held:
+            self.left_button_held = True
+
+    def on_key_release_event(self, widget, event):
+        if event.button == 1 and self.left_button_held:
+            self.left_button_held = False
 
 
 class PlaybackBox(Gtk.ButtonBox):

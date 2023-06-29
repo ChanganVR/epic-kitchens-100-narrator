@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 import traceback
 import gi
 from player import Player
@@ -12,6 +13,13 @@ from settings import Settings
 
 LOG = logging.getLogger('epic_narrator.controller')
 
+def get_video_size(video_path):
+    import cv2
+    video = cv2.VideoCapture(video_path)
+    width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    video.release()
+    return width, height
 
 class SignalSender(GObject.Object):
     @GObject.Signal(flags=GObject.SignalFlags.RUN_FIRST, arg_types=(int, str, str,))
@@ -102,6 +110,8 @@ class Controller:
         self.rec_played_with_video = False
         self.last_played_rec = None
         self.this_os = this_os
+        self.video_size = None
+        self.cursor_traj = []
 
         self.signal_sender = SignalSender()
         self.signal_sender.connect('video_moving', self.catch_video_moving)
@@ -312,6 +322,8 @@ class Controller:
         self.is_video_loaded = True
         self.video_length = self.player.get_video_length()
         self.signal_sender.emit('video_loaded', self.video_length, self.video_path, self.output_path)
+        
+        self.video_size = get_video_size(self.video_path)
 
         if self.loaded_last_video:
             last_position = self.get_setting('last_video_position', 1)
@@ -542,7 +554,7 @@ class Controller:
         else:
             self.invoke_stop_recording()
 
-    def start_recording(self, overwrite=False, rec_time=None):
+    def start_recording(self, overwrite=False, rec_time=None):        
         # first start the recording and then update the ui to prevent clipping
         if self.player.is_playing():
             self.pause_video()
@@ -584,6 +596,14 @@ class Controller:
 
     def stop_recording(self):
         self.recorder.stop_recording()
+
+        # dump the trajectory to a json file named by the timestamp
+        path = os.path.join(self.recordings.video_narrations_folder, '{}.json'.format(self.highlighted_rec))
+        with open(path, 'w') as fo:
+            print(self.cursor_traj)
+            json.dump(self.cursor_traj, fo)
+            self.cursor_traj = []
+            print('stop recording', self.highlighted_rec)
 
         LOG.info("Recording stopped")
         self.signal_sender.emit('recording_state_changed', 'not_recording')

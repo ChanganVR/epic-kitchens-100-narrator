@@ -7,4 +7,5 @@ flatpak/build-dir
 flatpak/epic_narrator.flatpak
 flatpak/repo
 build
-dist
+epic_narrator_recordings
+
